@@ -1,13 +1,12 @@
 use std::{
+    fs,
     path::PathBuf,
     process::Command,
     sync::{Arc, Mutex},
 };
 
 use once_cell::sync::Lazy;
-
 use serde_json::json;
-use std::fs;
 
 use crate::PortPool;
 
@@ -16,6 +15,8 @@ fn find_eth() -> PathBuf {
     path.push("../../citrea");
     path
 }
+
+const DEV_PRIVATE_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
 static PORT_POOL: Lazy<Mutex<PortPool>> =
     once_cell::sync::Lazy::new(|| Mutex::new(PortPool::new(12345..12346)));
@@ -124,7 +125,8 @@ impl EthNode {
         format!("http://127.0.0.1:{}", self.port)
     }
 
-    /// Returns the deployed contract addresses (available after `run_and_deploy`)
+    /// Returns the deployed contract addresses (available after
+    /// `run_and_deploy`)
     pub fn deployed(&self) -> &DeployedAddresses {
         self.deployed.as_ref().expect("Contracts not yet deployed")
     }
@@ -183,15 +185,15 @@ impl EthNode {
     }
 
     fn deploy(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let verifier = self.deploy_verifier()?;
         let mut command = Command::new("node_modules/.bin/hardhat");
 
         command.current_dir(find_eth());
 
-        command.env(
-            "SECRET_KEY",
-            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-        );
+        self.apply_devnet_env(&mut command);
+        command.env("SECRET_KEY", DEV_PRIVATE_KEY);
         command.env("TESTING_URL", self.rpc_url());
+        command.env("VERIFIER", verifier);
 
         if self.options.use_noop_verifier {
             command.env("DEV_USE_NOOP_VERIFIER", "1");
@@ -212,7 +214,8 @@ impl EthNode {
             .map(|v| v == "1")
             .unwrap_or(false);
 
-        // Always capture stdout (for DEPLOY_OUTPUT parsing) and stderr (for failure diagnostics)
+        // Always capture stdout (for DEPLOY_OUTPUT parsing) and stderr (for failure
+        // diagnostics)
         command.stdout(std::process::Stdio::piped());
         command.stderr(std::process::Stdio::piped());
 
@@ -251,6 +254,56 @@ impl EthNode {
         Err("Deploy script did not output DEPLOY_OUTPUT line".into())
     }
 
+    fn apply_devnet_env(&self, command: &mut Command) {
+        let rpc_url = self.rpc_url();
+        command.env("NETWORK", "dev");
+        command.env("RPC_URL", &rpc_url);
+        command.env("TESTING_URL", rpc_url);
+        command.env("PRIVATE_KEY", DEV_PRIVATE_KEY);
+    }
+
+    fn deploy_verifier(&self) -> Result<String, Box<dyn std::error::Error>> {
+        let mut command = Command::new("node_modules/.bin/hardhat");
+        command.current_dir(find_eth());
+        self.apply_devnet_env(&mut command);
+
+        command.arg("run");
+        if self.options.use_noop_verifier {
+            command.arg("scripts/devnet/deploy-verifiers-devnet.ts");
+        } else {
+            command.arg("scripts/deploy-verifier.ts");
+        }
+
+        let should_log = std::env::var("LOG_HARDHAT_DEPLOY_OUTPUT")
+            .map(|v| v == "1")
+            .unwrap_or(false);
+
+        command.stdout(std::process::Stdio::piped());
+        command.stderr(std::process::Stdio::piped());
+
+        let process = command.spawn().expect("Failed to start verifier deploy");
+        let output = process.wait_with_output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if !output.status.success() || should_log {
+            eprint!("{stdout}");
+            eprint!("{stderr}");
+        }
+
+        if !output.status.success() {
+            return Err("Verifier deploy returned a non-zero exit code".into());
+        }
+
+        for line in stdout.lines() {
+            if let Some(address) = line.strip_prefix("VERIFIER=") {
+                return Ok(address.to_string());
+            }
+        }
+
+        Err("Verifier deploy did not output VERIFIER line".into())
+    }
+
     pub async fn run_and_deploy(mut self) -> Arc<Self> {
         let eth_node = tokio::task::spawn_blocking(move || {
             self.run();
@@ -272,7 +325,10 @@ impl EthNode {
                     Ok(_) => break,
                     Err(err) => {
                         if i == 2 {
-                            panic!("Failed to deploy contracts: {err:?}; Run with LOG_HARDHAT_DEPLOY_OUTPUT=1 to see the output");
+                            panic!(
+                                "Failed to deploy contracts: {err:?}; Run with \
+                                 LOG_HARDHAT_DEPLOY_OUTPUT=1 to see the output"
+                            );
                         } else {
                             std::thread::sleep(std::time::Duration::from_secs(5));
                         }

@@ -1,4 +1,4 @@
-{ pkgs, lib, buildShell, barretenberg, noir }:
+{ pkgs, lib, rustShell, barretenberg, noir }:
 let
   optionalPackage = name:
     lib.optionals (lib.hasAttr name pkgs) [ pkgs.${name} ];
@@ -7,15 +7,16 @@ let
     optionalPackage "docker"
     ++ optionalPackage "docker-compose";
 
-  env = buildShell.env // {
+  env = rustShell.env // {
     BB_PATH = "${barretenberg}/bin";
+    CIPHERA_ZK_SHELL = "1";
   };
 in
 {
   inherit env;
 
   shell = (pkgs.mkShell.override { stdenv = pkgs.llvmPackages_latest.stdenv; }) (env // {
-    inputsFrom = [ buildShell.shell ];
+    inputsFrom = [ rustShell.shell ];
 
     packages = [
       barretenberg

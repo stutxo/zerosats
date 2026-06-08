@@ -91,6 +91,7 @@ async function main() {
     { [placeholder]: aggAggTranscriptAddr },
   );
   console.log(`✅ Aggregate Verifier Contract: ${aggregateVerifierAddr}`);
+  console.log(`VERIFIER=${aggregateVerifierAddr}`);
 }
 
 main()

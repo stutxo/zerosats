@@ -1,5 +1,5 @@
-// Devnet-only: deploys the aggregate Honk verifier binary against the local
-// Citrea regtest node. Refuses to run against any chain other than 5655.
+// Devnet-only: deploys the noop Honk verifier against the local Citrea
+// regtest node. Refuses to run against any chain other than 5655.
 
 import {
   createPublicClient,
@@ -8,7 +8,8 @@ import {
   formatEther,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { assertChainId, citreaDevChain, deployBin } from "../shared";
+import { assertChainId, citreaDevChain } from "../shared";
+import noopVerifierArtifact from "../../artifacts/contracts/NoopVerifierHonk.sol/HonkVerifier.json";
 
 const DEVNET_CHAIN_ID = 5655;
 
@@ -59,13 +60,19 @@ async function main() {
   console.log(`✅ Account:  ${account.address}`);
   console.log(`✅ Balance:  ${formatEther(balance)} cBTC`);
 
-  console.log("\n🔍 Deploying aggregate verifier...");
-  const aggregateVerifierAddr = await deployBin(
-    "noir/agg_agg_HonkVerifier.bin",
-    publicClient,
-    walletClient,
-  );
-  console.log(`✅ Aggregate Verifier Contract: ${aggregateVerifierAddr}`);
+  console.log("\n🔍 Deploying noop verifier...");
+  const verifierTx = await walletClient.deployContract({
+    abi: noopVerifierArtifact.abi,
+    bytecode: noopVerifierArtifact.bytecode as `0x${string}`,
+  });
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: verifierTx,
+  });
+  if (receipt.status !== "success" || !receipt.contractAddress) {
+    throw new Error("NoopVerifier deploy failed");
+  }
+  console.log(`✅ Noop Verifier Contract: ${receipt.contractAddress}`);
+  console.log(`VERIFIER=${receipt.contractAddress}`);
 }
 
 main()

@@ -22,12 +22,12 @@
         barretenberg-pkg = barretenberg-nix.packages.${system}.default;
         noir-pkg = barretenberg-nix.packages.${system}.noir;
 
-        buildShell = import ./nix/build-shell.nix {
+        rustShell = import ./nix/rust-shell.nix {
           inherit pkgs lib rustToolchain;
         };
 
         devShell = import ./nix/dev-shell.nix {
-          inherit pkgs lib buildShell;
+          inherit pkgs lib rustShell;
           barretenberg = barretenberg-pkg;
           noir = noir-pkg;
         };
@@ -35,7 +35,6 @@
       {
         devShells = {
           default = devShell.shell;
-          build = buildShell.shell;
         };
       }
     );

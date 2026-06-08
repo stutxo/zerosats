@@ -178,6 +178,32 @@ fi
 # Local mode: download Citrea binary, set up env, run tests natively
 # =============================================================================
 
+require_zk_shell() {
+    if [[ "${CIPHERA_ZK_SHELL:-}" != "1" ]]; then
+        cat >&2 <<EOF
+Local Ciphera e2e tests generate Noir/Barretenberg proofs and must run from the Ciphera Nix dev shell.
+
+Run one of:
+  cd "$REPO_ROOT/ciphera" && nix develop
+  nix develop "$REPO_ROOT/ciphera" --command "$REPO_ROOT/scripts/test.sh" --verbose
+
+Or use Docker mode:
+  "$REPO_ROOT/scripts/test.sh" --docker --verbose
+EOF
+        exit 1
+    fi
+
+    if [[ -z "${BB_PATH:-}" || ! -x "${BB_PATH}/bb" ]]; then
+        echo "CIPHERA_ZK_SHELL=1 is set, but BB_PATH does not point to an executable bb: ${BB_PATH:-<unset>}" >&2
+        exit 1
+    fi
+
+    if ! command -v nargo >/dev/null 2>&1; then
+        echo "CIPHERA_ZK_SHELL=1 is set, but nargo is not on PATH." >&2
+        exit 1
+    fi
+}
+
 # --- Download Citrea binary + resources ---
 setup_citrea() {
     local binary_path="${CIPHERA_TEST_CITREA_BIN:-$CITREA_DIR/bin/citrea}"
@@ -244,6 +270,7 @@ clean_stale_dbs() {
 }
 
 # --- Main (local) ---
+require_zk_shell
 setup_citrea
 compile_contracts
 clean_stale_dbs

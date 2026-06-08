@@ -2,7 +2,7 @@ use std::{
     env,
     io::{Read, Write},
     path::PathBuf,
-    process::Command,
+    process::{Command, Output},
 };
 
 use dirs::home_dir;
@@ -28,14 +28,30 @@ fn verify_bb_executable(path: &PathBuf) -> bool {
         })
         .unwrap_or(false)
 }
+
+fn bb_from_dir(path: PathBuf) -> Option<PathBuf> {
+    let bb_exe = path.join("bb");
+    if bb_exe.exists() && verify_bb_executable(&bb_exe) {
+        return Some(bb_exe);
+    }
+
+    None
+}
+
 fn get_bb_path() -> Result<PathBuf> {
+    if let Ok(bb) = env::var("BB_PATH").map(PathBuf::from) {
+        if let Some(bb_exe) = bb_from_dir(bb) {
+            return Ok(bb_exe);
+        }
+    }
+
     if let Some(path) = home_dir() {
         // bb is in home directory - standard setup
-        let bb_exe = path.join(".bb/bb");
-        if bb_exe.exists() && verify_bb_executable(&bb_exe) {
+        if let Some(bb_exe) = bb_from_dir(path.join(".bb")) {
             return Ok(bb_exe);
         }
     };
+
     if let Ok(workdir) = env::current_exe() {
         // Current directory (MACOS binaries)
         let bb_exe = workdir.parent().unwrap().join("bb");
@@ -43,14 +59,7 @@ fn get_bb_path() -> Result<PathBuf> {
             return Ok(bb_exe);
         }
     };
-    if let Ok(bb) = env::var("BB_PATH").map(PathBuf::from) {
-        // Last resort
-        let bb_exe = bb.join("bb");
-        // Verify it exists
-        if bb_exe.exists() && verify_bb_executable(&bb_exe) {
-            return Ok(bb_exe);
-        }
-    }
+
     // eventually searching in PATH
     let which_result = Command::new("which").arg("bb").output()?;
 
@@ -67,6 +76,30 @@ fn get_bb_path() -> Result<PathBuf> {
     Err("Barretenberg backend not found".to_owned().into())
 }
 
+fn format_bb_failure(action: &str, bb_path: &PathBuf, output: &Output) -> String {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    #[cfg(unix)]
+    let signal = {
+        use std::os::unix::process::ExitStatusExt;
+        output.status.signal()
+    };
+    #[cfg(not(unix))]
+    let signal: Option<i32> = None;
+
+    format!(
+        "bb {action} failed\nbb: {}\nstatus: {}\ncode: {:?}\nsignal: \
+         {:?}\nstdout:\n{}\nstderr:\n{}",
+        bb_path.display(),
+        output.status,
+        output.status.code(),
+        signal,
+        stdout,
+        stderr
+    )
+}
+
 impl Backend for CliBackend {
     fn prove(
         program: &[u8],
@@ -75,7 +108,7 @@ impl Backend for CliBackend {
         oracle_hash_keccak: bool,
     ) -> Result<Vec<u8>> {
         let mut witness_gz = GzEncoder::new(witness, Compression::none());
-        let mut witness_gz_buf = Vec::with_capacity(witness.len() + 0xFF);
+        let mut witness_gz_buf = Vec::with_capacity(witness.len() + 0xff);
         witness_gz.read_to_end(&mut witness_gz_buf)?;
         let witness_gz = witness_gz_buf;
 
@@ -114,8 +147,7 @@ impl Backend for CliBackend {
 
         let output = cmd.output()?;
         if !output.status.success() {
-            let stderr = String::from_utf8(output.stderr)?;
-            return Err(stderr.into());
+            return Err(format_bb_failure("prove", &bb_path, &output).into());
         }
 
         let proof_path = output_dir.path().join("proof");
@@ -170,9 +202,9 @@ impl Backend for CliBackend {
 
         if !output.status.success() {
             // TODO: return false instead? maybe pass -v and parse out verified: {0/1}
-            let stderr = String::from_utf8(output.stderr)?;
-            error!("proof error: {}", stderr);
-            return Err(stderr.into());
+            let error = format_bb_failure("verify", &bb_path, &output);
+            error!("proof error: {}", error);
+            return Err(error.into());
         }
 
         Ok(())
@@ -181,10 +213,11 @@ impl Backend for CliBackend {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs::{self, copy, remove_file};
 
     use temp_env::with_var;
+
+    use super::*;
 
     #[test]
     fn test_verify_bb_does_not_exist() {
