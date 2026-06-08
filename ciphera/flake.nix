@@ -19,7 +19,9 @@
         };
         lib = pkgs.lib;
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-        barretenberg-pkg = barretenberg-nix.packages.${system}.default;
+        barretenberg-pkg = import ./nix/barretenberg-bin.nix {
+          inherit pkgs lib system;
+        };
         noir-pkg = barretenberg-nix.packages.${system}.noir;
 
         rustShell = import ./nix/rust-shell.nix {
