@@ -1,12 +1,12 @@
 {
-  description = "Rust Development Shell";
+  description = "Ciphera development shell";
 
   inputs = {
     nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url  = "github:numtide/flake-utils";
     barretenberg-nix = {
-      url = "git+ssh://git@github.com/satsbridge/barretenberg-nix.git";
+      url = "git+ssh://git@github.com/zerosats/barretenberg-nix.git?ref=macos";
     };
   };
 
@@ -17,40 +17,25 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+        lib = pkgs.lib;
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
         barretenberg-pkg = barretenberg-nix.packages.${system}.default;
         noir-pkg = barretenberg-nix.packages.${system}.noir;
+
+        buildShell = import ./nix/build-shell.nix {
+          inherit pkgs lib rustToolchain;
+        };
+
+        devShell = import ./nix/dev-shell.nix {
+          inherit pkgs lib buildShell;
+          barretenberg = barretenberg-pkg;
+          noir = noir-pkg;
+        };
       in
-      with pkgs;
       {
-        # Override the default GCC environment with the Clang environment
-        devShells.default = mkShell.override { stdenv = llvmPackages_latest.stdenv; } {
-          nativeBuildInputs = [
-            cmake
-            pkg-config
-            ninja
-            llvmPackages_latest.bintools
-          ];
-
-          buildInputs = [
-            barretenberg-pkg
-            noir-pkg
-            python310
-            openssl
-            go
-            protobuf
-            (
-              rust-bin.fromRustupToolchainFile ./rust-toolchain.toml
-            )
-            llvmPackages_latest.openmp
-          ];
-          
-          RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
-          LIBCLANG_PATH = pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ];
-
-	  shellHook = ''
-  		export CMAKE_C_FLAGS="-march=x86-64"
-  		export CMAKE_CXX_FLAGS="-march=x86-64"
-	  '';
+        devShells = {
+          default = devShell.shell;
+          build = buildShell.shell;
         };
       }
     );
