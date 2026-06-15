@@ -3,7 +3,7 @@
 resolver = "2"
 
 members = ["pkg/*"]
-exclude = ["pkg/.claude"]
+exclude = ["pkg/.claude", "pkg/mercury-latch-swap"]
 
 # `opt-level = 1` has a decent impact on perf, and doesn't impact compile times much
 [profile.dev]

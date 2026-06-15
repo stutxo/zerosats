@@ -1,0 +1,32 @@
+[package]
+name = "mercury-latch-swap"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "mercury-latch-swap"
+path = "src/main.rs"
+
+[dependencies]
+barretenberg = { path = "../barretenberg" }
+bitcoin-clock = { path = "../bitcoin-clock" }
+clap = { version = "4.3.19", features = ["derive", "env"] }
+cli = { path = "../cli" }
+color-eyre = "0.6"
+element = { path = "../element" }
+hash = { path = "../hash" }
+hex = { version = "0.4", features = ["serde"] }
+mercuryrustlib = { git = "https://github.com/zerosats/mercury-lab.git", branch = "main", package = "mercuryrustlib" }
+node-interface = { path = "../node-interface" }
+reqwest = { version = "0.13.3", features = ["json"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.108"
+sha2 = "0.10.6"
+# Without a committed lockfile, keep Noir's transitive smol_str below the
+# Rust 1.89-only releases while this repo uses Rust 1.88.
+smol_str = "=0.3.2"
+tokio = { version = "1.52.3", features = ["full"] }
+zk-primitives = { path = "../zk-primitives" }
+
+[patch.crates-io]
+secp256k1 = { git = "https://github.com/w0xlt/rust-secp256k1.git", branch = "mercury-blinded-musig-port" }

@@ -1,0 +1,738 @@
+
+[10:45:36] demo run directory: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135
+
+
+========== Setup ==========
+
+[10:45:36] installing Barretenberg
+3.0.0-nightly.20251030-2
+
+[10:45:36] building swap binary
+     Locking 2 packages to latest compatible versions
+      Adding mercurylib v0.1.0 (/Users/stu/lx/mercury-lab/lib)
+      Adding mercuryrustlib v0.1.0 (/Users/stu/lx/mercury-lab/clients/libs/rust)
+warning: use of deprecated associated function `secp256k1::key::secret::<impl web3::signing::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+  --> /Users/stu/lx/zerosats/ciphera/pkg/eth-util/src/keystore.rs:81:16
+   |
+81 |     SecretKey::from_slice(&bytes)
+   |                ^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: `eth-util` (lib) generated 1 warning
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+  --> /Users/stu/lx/mercury-lab/lib/src/transaction.rs:82:60
+   |
+82 |     let client_session_id = MusigSessionId::new(&mut rand::thread_rng());
+   |                                                            ^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+  --> /Users/stu/lx/mercury-lab/lib/src/transaction.rs:97:58
+   |
+97 |     let blinding_factor = BlindingFactor::new(&mut rand::thread_rng());
+   |                                                          ^^^^^^^^^^
+
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+   --> /Users/stu/lx/mercury-lab/lib/src/transaction.rs:118:25
+    |
+118 |     let mut rng = rand::thread_rng();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+   --> /Users/stu/lx/mercury-lab/lib/src/wallet/mod.rs:354:25
+    |
+354 |     let mut rng = rand::thread_rng();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+  --> /Users/stu/lx/mercury-lab/lib/src/deposit/mod.rs:49:24
+   |
+49 |     let msg = Message::from_hashed_data::<sha256::Hash>(token_id.to_string().as_bytes());
+   |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+  --> /Users/stu/lx/mercury-lab/lib/src/deposit/mod.rs:54:32
+   |
+54 |     let signed_token_id = secp.sign_schnorr(msg.as_ref(), &keypair);
+   |                                ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+  --> /Users/stu/lx/mercury-lab/lib/src/deposit/mod.rs:82:24
+   |
+82 |     let msg = Message::from_hashed_data::<sha256::Hash>(statechain_id.to_string().as_bytes());
+   |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+  --> /Users/stu/lx/mercury-lab/lib/src/deposit/mod.rs:83:37
+   |
+83 |     let signed_statechain_id = secp.sign_schnorr(msg.as_ref(), &keypair);
+   |                                     ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::rand::Rng::gen_range`: Renamed to `random_range`
+   --> /Users/stu/lx/mercury-lab/lib/src/transaction.rs:119:22
+    |
+119 |     let number = rng.gen_range(0..=10);
+    |                      ^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::rand::Rng::gen_range`: Renamed to `random_range`
+   --> /Users/stu/lx/mercury-lab/lib/src/transaction.rs:123:35
+    |
+123 |         locktime = locktime - rng.gen_range(0..=99);
+    |                                   ^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::key::secret::<impl secp256k1::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transaction.rs:328:28
+    |
+328 |     let tweak = SecretKey::from_slice(tap_tweak_bytes)?;
+    |                            ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_slice`: use from_digest_slice instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transaction.rs:426:24
+    |
+426 |     let msg = Message::from_slice(hex::decode(msg)?.as_slice())?;
+    |                        ^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:150:25
+    |
+150 |         client_auth_key.secret_bytes().as_slice(),
+    |                         ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:196:24
+    |
+196 |     let msg = Message::from_hashed_data::<sha256::Hash>(&data_to_verify);
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::verify_schnorr`: use schnorr::verify instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:199:10
+    |
+199 |         .verify_schnorr(&signature, msg.as_ref(), &sender_public_key)
+    |          ^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:224:25
+    |
+224 |         XOnlyPublicKey::from_slice(transfer_aggregate_address.script_pubkey()[2..].as_bytes())
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:232:25
+    |
+232 |         XOnlyPublicKey::from_slice(tx0_output.script_pubkey[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::schnorr::Signature::from_slice`: Use `from_byte_array` instead.
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:409:32
+    |
+409 |     let signature = Signature::from_slice(signature_data).unwrap();
+    |                                ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:418:25
+    |
+418 |         XOnlyPublicKey::from_slice(tx0_output.script_pubkey[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::verify_schnorr`: use schnorr::verify instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:447:10
+    |
+447 |         .verify_schnorr(&signature, msg.as_ref(), &xonly_pubkey)
+    |          ^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::key::secret::<impl secp256k1::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:591:28
+    |
+591 |     let tweak = SecretKey::from_slice(tap_tweak_bytes)?;
+    |                            ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::key::secret::<impl secp256k1::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:630:32
+    |
+630 |     let secret_t1 = SecretKey::from_slice(t1)?;
+    |                                ^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:676:33
+    |
+676 |     let t2_hex = hex::encode(t2.secret_bytes());
+    |                                 ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:681:24
+    |
+681 |     let msg = Message::from_hashed_data::<sha256::Hash>(t2_hex.as_bytes());
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:682:25
+    |
+682 |     let auth_sig = secp.sign_schnorr(msg.as_ref(), &client_auth_keypair);
+    |                         ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:700:31
+    |
+700 |     let hashed_msg = Message::from_hashed_data::<sha256::Hash>(message.to_string().as_bytes());
+    |                               ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:701:31
+    |
+701 |     let signed_message = secp.sign_schnorr(hashed_msg.as_ref(), &client_auth_keypair);
+    |                               ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:731:25
+    |
+731 |         XOnlyPublicKey::from_slice(aggregate_address.script_pubkey()[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:738:25
+    |
+738 |         XOnlyPublicKey::from_slice(tx0_output.script_pubkey[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:747:24
+    |
+747 |     let msg = Message::from_hashed_data::<sha256::Hash>(statechain_id.to_string().as_bytes());
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/receiver.rs:748:37
+    |
+748 |     let signed_statechain_id = secp.sign_schnorr(msg.as_ref(), &client_auth_keypair);
+    |                                     ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+  --> /Users/stu/lx/mercury-lab/lib/src/transfer/sender.rs:84:24
+   |
+84 |     let msg = Message::from_hashed_data::<sha256::Hash>(&data_to_sign);
+   |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+  --> /Users/stu/lx/mercury-lab/lib/src/transfer/sender.rs:85:26
+   |
+85 |     let signature = secp.sign_schnorr(msg.as_ref(), &keypair);
+   |                          ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> /Users/stu/lx/mercury-lab/lib/src/transfer/sender.rs:115:16
+    |
+115 |         t1: t1.secret_bytes(),
+    |                ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> /Users/stu/lx/mercury-lab/lib/src/wallet/cpfp_tx.rs:272:20
+    |
+272 |     let sig = secp.sign_schnorr(msg.as_ref(), &keypair);
+    |                    ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> /Users/stu/lx/mercury-lab/lib/src/wallet/key_derivation.rs:116:55
+    |
+116 |             PrivateKey::from_slice(&client_secret_key.secret_bytes(), network)?.to_wif();
+    |                                                       ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> /Users/stu/lx/mercury-lab/lib/src/wallet/key_derivation.rs:118:49
+    |
+118 |             PrivateKey::from_slice(&auth_secret.secret_bytes(), network)?.to_wif();
+    |                                                 ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::rand::Rng::gen`: Renamed to `random` to avoid conflict with the new `gen` keyword in Rust 2024.
+   --> /Users/stu/lx/mercury-lab/lib/src/wallet/mod.rs:355:39
+    |
+355 |     let entropy = (0..16).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>(); // 16 bytes of entropy for 12 words
+    |                                       ^^^
+
+warning: `mercurylib` (lib) generated 38 warnings
+warning: use of deprecated method `secp256k1::key::secret::<impl web3::signing::SecretKey>::secret_bytes`: use to_secret_bytes instead
+  --> /Users/stu/lx/zerosats/ciphera/pkg/contracts/src/util.rs:11:42
+   |
+11 |     secp256k1::SecretKey::from_slice(&sk.secret_bytes()).unwrap()
+   |                                          ^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `secp256k1::key::secret::<impl web3::signing::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+  --> /Users/stu/lx/zerosats/ciphera/pkg/contracts/src/util.rs:15:31
+   |
+15 |     web3::signing::SecretKey::from_slice(&sk[..]).unwrap()
+   |                               ^^^^^^^^^^
+
+warning: `contracts` (lib) generated 2 warnings
+warning: use of deprecated method `secp256k1::key::secret::<impl contracts::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> /Users/stu/lx/zerosats/ciphera/pkg/cli/src/client.rs:455:63
+    |
+455 |         let secret_key = secp256k1::SecretKey::from_slice(&sk.secret_bytes()).unwrap();
+    |                                                               ^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: `cli` (lib) generated 1 warning
+warning: fields `commitment` and `refund_address` are never read
+  --> src/latch.rs:73:9
+   |
+72 | pub struct LatchFundResult {
+   |            --------------- fields in this struct
+73 |     pub commitment: Element,
+   |         ^^^^^^^^^^
+74 |     pub refund_address: Element,
+   |         ^^^^^^^^^^^^^^
+   |
+   = note: `LatchFundResult` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `mercury-latch-swap` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.32s
+
+[10:45:37] building ciphera-cli
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `release` profile [optimized] target(s) in 1.80s
+
+[10:45:39] building Mercury client
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+  --> lib/src/transaction.rs:82:60
+   |
+82 |     let client_session_id = MusigSessionId::new(&mut rand::thread_rng());
+   |                                                            ^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+  --> lib/src/transaction.rs:97:58
+   |
+97 |     let blinding_factor = BlindingFactor::new(&mut rand::thread_rng());
+   |                                                          ^^^^^^^^^^
+
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+   --> lib/src/transaction.rs:118:25
+    |
+118 |     let mut rng = rand::thread_rng();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated function `secp256k1::rand::thread_rng`: Renamed to `rng`
+   --> lib/src/wallet/mod.rs:354:25
+    |
+354 |     let mut rng = rand::thread_rng();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+  --> lib/src/deposit/mod.rs:49:24
+   |
+49 |     let msg = Message::from_hashed_data::<sha256::Hash>(token_id.to_string().as_bytes());
+   |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+  --> lib/src/deposit/mod.rs:54:32
+   |
+54 |     let signed_token_id = secp.sign_schnorr(msg.as_ref(), &keypair);
+   |                                ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+  --> lib/src/deposit/mod.rs:82:24
+   |
+82 |     let msg = Message::from_hashed_data::<sha256::Hash>(statechain_id.to_string().as_bytes());
+   |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+  --> lib/src/deposit/mod.rs:83:37
+   |
+83 |     let signed_statechain_id = secp.sign_schnorr(msg.as_ref(), &keypair);
+   |                                     ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::rand::Rng::gen_range`: Renamed to `random_range`
+   --> lib/src/transaction.rs:119:22
+    |
+119 |     let number = rng.gen_range(0..=10);
+    |                      ^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::rand::Rng::gen_range`: Renamed to `random_range`
+   --> lib/src/transaction.rs:123:35
+    |
+123 |         locktime = locktime - rng.gen_range(0..=99);
+    |                                   ^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::key::secret::<impl secp256k1::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+   --> lib/src/transaction.rs:328:28
+    |
+328 |     let tweak = SecretKey::from_slice(tap_tweak_bytes)?;
+    |                            ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_slice`: use from_digest_slice instead
+   --> lib/src/transaction.rs:426:24
+    |
+426 |     let msg = Message::from_slice(hex::decode(msg)?.as_slice())?;
+    |                        ^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> lib/src/transfer/receiver.rs:150:25
+    |
+150 |         client_auth_key.secret_bytes().as_slice(),
+    |                         ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> lib/src/transfer/receiver.rs:196:24
+    |
+196 |     let msg = Message::from_hashed_data::<sha256::Hash>(&data_to_verify);
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::verify_schnorr`: use schnorr::verify instead
+   --> lib/src/transfer/receiver.rs:199:10
+    |
+199 |         .verify_schnorr(&signature, msg.as_ref(), &sender_public_key)
+    |          ^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> lib/src/transfer/receiver.rs:224:25
+    |
+224 |         XOnlyPublicKey::from_slice(transfer_aggregate_address.script_pubkey()[2..].as_bytes())
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> lib/src/transfer/receiver.rs:232:25
+    |
+232 |         XOnlyPublicKey::from_slice(tx0_output.script_pubkey[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::schnorr::Signature::from_slice`: Use `from_byte_array` instead.
+   --> lib/src/transfer/receiver.rs:409:32
+    |
+409 |     let signature = Signature::from_slice(signature_data).unwrap();
+    |                                ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> lib/src/transfer/receiver.rs:418:25
+    |
+418 |         XOnlyPublicKey::from_slice(tx0_output.script_pubkey[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::verify_schnorr`: use schnorr::verify instead
+   --> lib/src/transfer/receiver.rs:447:10
+    |
+447 |         .verify_schnorr(&signature, msg.as_ref(), &xonly_pubkey)
+    |          ^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::key::secret::<impl secp256k1::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+   --> lib/src/transfer/receiver.rs:591:28
+    |
+591 |     let tweak = SecretKey::from_slice(tap_tweak_bytes)?;
+    |                            ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::key::secret::<impl secp256k1::SecretKey>::from_slice`: use from_secret_bytes or from_byte_array instead
+   --> lib/src/transfer/receiver.rs:630:32
+    |
+630 |     let secret_t1 = SecretKey::from_slice(t1)?;
+    |                                ^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> lib/src/transfer/receiver.rs:676:33
+    |
+676 |     let t2_hex = hex::encode(t2.secret_bytes());
+    |                                 ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> lib/src/transfer/receiver.rs:681:24
+    |
+681 |     let msg = Message::from_hashed_data::<sha256::Hash>(t2_hex.as_bytes());
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> lib/src/transfer/receiver.rs:682:25
+    |
+682 |     let auth_sig = secp.sign_schnorr(msg.as_ref(), &client_auth_keypair);
+    |                         ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> lib/src/transfer/receiver.rs:700:31
+    |
+700 |     let hashed_msg = Message::from_hashed_data::<sha256::Hash>(message.to_string().as_bytes());
+    |                               ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> lib/src/transfer/receiver.rs:701:31
+    |
+701 |     let signed_message = secp.sign_schnorr(hashed_msg.as_ref(), &client_auth_keypair);
+    |                               ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> lib/src/transfer/receiver.rs:731:25
+    |
+731 |         XOnlyPublicKey::from_slice(aggregate_address.script_pubkey()[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::XOnlyPublicKey::from_slice`: Use `from_byte_array` instead.
+   --> lib/src/transfer/receiver.rs:738:25
+    |
+738 |         XOnlyPublicKey::from_slice(tx0_output.script_pubkey[2..].as_bytes()).unwrap();
+    |                         ^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+   --> lib/src/transfer/receiver.rs:747:24
+    |
+747 |     let msg = Message::from_hashed_data::<sha256::Hash>(statechain_id.to_string().as_bytes());
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> lib/src/transfer/receiver.rs:748:37
+    |
+748 |     let signed_statechain_id = secp.sign_schnorr(msg.as_ref(), &client_auth_keypair);
+    |                                     ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `secp256k1::Message::from_hashed_data`: hash externally and use Message::from or from_digest
+  --> lib/src/transfer/sender.rs:84:24
+   |
+84 |     let msg = Message::from_hashed_data::<sha256::Hash>(&data_to_sign);
+   |                        ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+  --> lib/src/transfer/sender.rs:85:26
+   |
+85 |     let signature = secp.sign_schnorr(msg.as_ref(), &keypair);
+   |                          ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> lib/src/transfer/sender.rs:115:16
+    |
+115 |         t1: t1.secret_bytes(),
+    |                ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::schnorr::<impl secp256k1::Secp256k1<C>>::sign_schnorr`: use schnorr::sign instead
+   --> lib/src/wallet/cpfp_tx.rs:272:20
+    |
+272 |     let sig = secp.sign_schnorr(msg.as_ref(), &keypair);
+    |                    ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> lib/src/wallet/key_derivation.rs:116:55
+    |
+116 |             PrivateKey::from_slice(&client_secret_key.secret_bytes(), network)?.to_wif();
+    |                                                       ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::key::secret::<impl secp256k1::SecretKey>::secret_bytes`: use to_secret_bytes instead
+   --> lib/src/wallet/key_derivation.rs:118:49
+    |
+118 |             PrivateKey::from_slice(&auth_secret.secret_bytes(), network)?.to_wif();
+    |                                                 ^^^^^^^^^^^^
+
+warning: use of deprecated method `secp256k1::rand::Rng::gen`: Renamed to `random` to avoid conflict with the new `gen` keyword in Rust 2024.
+   --> lib/src/wallet/mod.rs:355:39
+    |
+355 |     let entropy = (0..16).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>(); // 16 bytes of entropy for 12 words
+    |                                       ^^^
+
+warning: `mercurylib` (lib) generated 38 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.04s
+
+
+========== Prepare Mercury ==========
+
+[10:45:40] creating Mercury wallets
+Wallet created: Wallet { name: "seller", mnemonic: "donkey auto today icon feel put letter iron comfort desk explain elder", version: "0.1.0", state_entity_endpoint: "http://204.168.231.217:28000", chain_backend: "e
+lectrum", chain_endpoint: "tcp://62.238.20.16:50001", network: "signet", blockheight: 4405, initlock: 1000, interval: 10, tokens: [], activities: [], coins: [], settings: Settings { network: "signet", block_explorer
+URL: None, torProxyHost: None, torProxyPort: None, torProxyControlPassword: None, torProxyControlPort: None, statechainEntityApi: "http://204.168.231.217:28000", torStatechainEntityApi: None, chainBackend: "electrum
+", chainUrl: "tcp://62.238.20.16:50001", chainType: Some("electrs"), notifications: false, tutorials: false } }
+Wallet created: Wallet { name: "buyer", mnemonic: "problem lawsuit bulk edge abuse movie category wedding during neck tribe tuna", version: "0.1.0", state_entity_endpoint: "http://204.168.231.217:28000", chain_backe
+nd: "electrum", chain_endpoint: "tcp://62.238.20.16:50001", network: "signet", blockheight: 4405, initlock: 1000, interval: 10, tokens: [], activities: [], coins: [], settings: Settings { network: "signet", block_ex
+plorerURL: None, torProxyHost: None, torProxyPort: None, torProxyControlPassword: None, torProxyControlPort: None, statechainEntityApi: "http://204.168.231.217:28000", torStatechainEntityApi: None, chainBackend: "el
+ectrum", chainUrl: "tcp://62.238.20.16:50001", chainType: Some("electrs"), notifications: false, tutorials: false } }
+
+[10:45:42] funding Mercury token fee if required
+{
+  "confirmation_target": 2,
+  "deposit_address": "tb1q6kx6e45zz0nh9z664pa5tpm43pmx5hewx45ckn",
+  "fee": 10000,
+  "payment_method": "onchain",
+  "token_id": "100df6af-6ebb-4bc4-ad5c-68d11c222da9"
+}
+{"ok":true,"txid":"bcd632ffc5737609c9c1282f584cb8c4048a82684caf69e5c8ffa31e36804f67"}
+{"ok":true,"pending_burst":2}
+
+[10:45:52] funding seller Mercury statecoin
+{
+  "address": "tb1py5d4d20mk78ggznf4na0pvd5wstmjr2p3px4rf93a22ycwvggrjqfexgjl"
+}
+{"ok":true,"txid":"6cf74355e571dd9d829f14cbd4f65b7226d362fb77d2bd383fbc7d5e9117bb94"}
+{"ok":true,"pending_burst":2}
+
+[10:45:53] waiting for confirmed seller statecoin
+[
+  {
+    "coin.address": "tml1qqpem5xdk0f2y95d5c2rw5zkt74dwufu8e4aue2kcvshrgp8qfz65xgrraau3pctvudp9zpgztm0c4v0qms5xwn6c4t3k2zlur9x05aprlwqpd4hgf",
+    "coin.aggregated_address": "tb1py5d4d20mk78ggznf4na0pvd5wstmjr2p3px4rf93a22ycwvggrjqfexgjl",
+    "coin.amount": 10000,
+    "coin.locktime": 5407,
+    "coin.statechain_id": "d29928fd819f499d9cad6abe3b6a89a7",
+    "coin.status": "IN_MEMPOOL",
+    "coin.user_pubkey": "039dd0cdb3d2a2168da6143750565faad7713c3e6bde6556c32171a0270245aa19"
+  }
+]
+[
+  {
+    "coin.address": "tml1qqpem5xdk0f2y95d5c2rw5zkt74dwufu8e4aue2kcvshrgp8qfz65xgrraau3pctvudp9zpgztm0c4v0qms5xwn6c4t3k2zlur9x05aprlwqpd4hgf",
+    "coin.aggregated_address": "tb1py5d4d20mk78ggznf4na0pvd5wstmjr2p3px4rf93a22ycwvggrjqfexgjl",
+    "coin.amount": 10000,
+    "coin.locktime": 5407,
+    "coin.statechain_id": "d29928fd819f499d9cad6abe3b6a89a7",
+    "coin.status": "CONFIRMED",
+    "coin.user_pubkey": "039dd0cdb3d2a2168da6143750565faad7713c3e6bde6556c32171a0270245aa19"
+  }
+]
+d29928fd819f499d9cad6abe3b6a89a7
+
+
+========== Prepare Zerosats ==========
+
+[10:45:59] preparing Zerosats wallets
+
+✅ Node Health Check Passed!
+   Current Height: 861843
+   Height (verified): 861843
+   Obtained transactions list size: 10
+
+✨ Successfully connected to Ciphera node at https://ciphera.satsbridge.com
+
+
+Citrea private key for mint funding:
+
+[10:46:07] minting buyer Zerosats wallet
+Note hash 0x36f78faf55c2dab3b3f8eab4e2b9cb58c9c007916d528fa79f08356218bb6c7, mint hash 0x3e1d8888eb4c399851f7a9889f87d3d7372564eec18c4cbe260571ff4de380c
+
+Submitted MINT tx 0xb6a56b836ce3814ab41f6cc82173726dd973b8c6c65864c870adcbe383d0fe05
+
+
+✅ Transaction 36f78faf55c2dab3b3f8eab4e2b9cb58c9c007916d528fa79f08356218bb6c7 has been sent!
+   Height: 861852
+   Root hash: 2a2176682d31d92fcb660546416fc8f32df098fbd4a54ae1964ec8ff6e89c53b
+
+Balance 1000 sats WCBTC
+
+
+
+✅ Node Health Check Passed!
+   Current Height: 861852
+   Height (verified): 861852
+   Obtained transactions list size: 10
+
+✨ Successfully connected to Ciphera node at https://ciphera.satsbridge.com
+
+
+
+
+========== Swap ==========
+
+[10:46:18] starting timed swap batch
+
+[10:46:18] Swap step 1/11: Initialize local swap state
+  summary: statechain_id=d29928fd819f499d9cad6abe3b6a89a7 amount_sat=1000 mercury_amount_sat=10000
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:19] Swap step 2/11: Mercury creates payment hash and batch id
+  summary: batch_id=4a54758a-43b0-4723-87d1-f7b696c0a5f9 payment_hash=5babb1555e366aade7bb27075fff2f8e0db4a4e665d470810b3405e4fab37d4a
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:20] Swap step 3/11: Create Mercury transfer address and Zerosats refund address
+  summary: mercury_transfer_address=tml1qqpxv27last6qryac3ahv6sahp57u3nlprxgj26qd7wjhx626amfmhszr2xscdsun0hql05va2kc9ddvwypnm6gn67rzxapgx884j3z6gs4qwlduc9
+  summary: refund_address=83c3a6f6aa3d527a4034b1b18171a8853f3a093404b38e253b19cb5feec2536
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:20] Swap step 4/11: Zerosats creates unfunded latch template
+  summary: template_note=/Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-template.json
+  summary: latch_commitment=1f5889e74f91d57e29141d3ee210b566956bb14587f1673782a09a17b32da07d
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:20] Swap step 5/11: Zerosats funds exact latch template
+  summary: refund_note=/Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-refund.json balance_sat=0
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:22] Swap step 6/11: Zerosats verifies funded latch before Mercury transfer
+  summary: commitment=1f5889e74f91d57e29141d3ee210b566956bb14587f1673782a09a17b32da07d height=861854
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:22] Swap step 7/11: Mercury starts locked transfer
+  summary: retrieved_hash=5babb1555e366aade7bb27075fff2f8e0db4a4e665d470810b3405e4fab37d4a hash_matches=true
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:23] Swap step 8/11: Mercury unlocks transfer after fresh Zerosats verification
+  summary: unlocked=true verified_height=861854
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:24] Swap step 9/11: Mercury receiver completes receive
+  summary: received_amount_sat=10000 expected_statechain=true
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:25] Swap step 10/11: Mercury owner retrieves preimage after receive
+  summary: preimage_hash=5babb1555e366aade7bb27075fff2f8e0db4a4e665d470810b3405e4fab37d4a hash_matches=true
+  secret: preimage stored in state file only
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+[10:46:25] Swap step 11/11: Zerosats claimer claims latch with preimage
+  summary: claim_tx=29c0cb4740a493cbf39427d5b910252291b20088300a03cf42fb726512e95aa0 balance_sat=8000 ticker=WCBTC
+  state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+  status: ok
+
+
+========== Final Checks ==========
+
+[10:46:30] checking final balances and artifacts
+[
+  {
+    "coin.address": "tml1qqpxv27last6qryac3ahv6sahp57u3nlprxgj26qd7wjhx626amfmhszr2xscdsun0hql05va2kc9ddvwypnm6gn67rzxapgx884j3z6gs4qwlduc9",
+    "coin.aggregated_address": "tb1py5d4d20mk78ggznf4na0pvd5wstmjr2p3px4rf93a22ycwvggrjqfexgjl",
+    "coin.amount": 10000,
+    "coin.locktime": 5397,
+    "coin.statechain_id": "d29928fd819f499d9cad6abe3b6a89a7",
+    "coin.status": "CONFIRMED",
+    "coin.user_pubkey": "02662bdfec17a00c9dc47b766a1db869ee467f08cc892b406f9d2b9b4ad7769dde"
+  }
+]
+
+✅ Node Health Check Passed!
+   Current Height: 861858
+   Height (verified): 861858
+   Obtained transactions list size: 10
+
+✨ Successfully connected to Ciphera node at https://ciphera.satsbridge.com
+
+
+"seller"
+5115
+80000000000000
+-rw-r--r--@ 1 stu  staff  1233 Jun 21 10:46 /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-refund.json
+{
+  "claim_transaction": {
+    "txn_hash": "29c0cb4740a493cbf39427d5b910252291b20088300a03cf42fb726512e95aa0",
+    "height": "861858",
+    "root_hash": "fb8fbe42cf9a65aa4a61da82c6326cb3a1ee073a2afb8948110b7748404e8b5"
+  },
+  "balance_sat": 8000,
+  "ticker": "WCBTC"
+}
+
+[10:46:30] demo complete
+Run directory: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135
+Swap state: /Users/stu/lx/ciphera-demo-data/runs/mercury-ciphera-latch-demo-1782035135/mercury-ciphera-swap-state.json
+
+Press enter to close this pane.
+

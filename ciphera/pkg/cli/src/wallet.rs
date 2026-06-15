@@ -213,7 +213,6 @@ impl Wallet {
         let opt_balance = self.avail.get_mut(ticker).and_then(|notes| {
             let pos = notes.iter().position(|n| n.note == note.note)?;
             let removed_note = notes.remove(pos);
-            println!("{removed_note:?}");
             let note_amount = removed_note
                 .note
                 .value

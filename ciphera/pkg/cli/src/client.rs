@@ -5,7 +5,7 @@
 
 use crate::wallet::Wallet;
 use color_eyre::Result;
-use contracts::{ERC20Contract, SignedRollupContract};
+use contracts::{ERC20Contract, SignedRollupContract, util::convert_element_to_h256};
 use hash::hash_merge;
 use node_interface::{HeightResponse, TransactionResponse};
 use once_cell::sync::Lazy;
@@ -28,11 +28,14 @@ use crate::rpc::{HealthResponse, ListTransactionsResponse, ListTxnsQuery};
 /// Provides connection pooling and efficient resource reuse
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
     debug!("Initializing singleton HTTP client");
-    reqwest::Client::builder()
+    let builder = reqwest::Client::builder()
         .pool_max_idle_per_host(10)
-        .tcp_keepalive(Some(Duration::from_secs(60)))
-        .build()
-        .expect("Failed to build HTTP client")
+        .tcp_keepalive(Some(Duration::from_secs(60)));
+
+    #[cfg(test)]
+    let builder = builder.no_proxy();
+
+    builder.build().expect("Failed to build HTTP client")
 });
 
 /// Builder for constructing NodeClient instances with fluent API
@@ -388,26 +391,47 @@ impl NodeClient {
         let client = contracts::Client::new(geth_rpc, None);
 
         let rollup = SignedRollupContract::load(client, &chain_id, rollup, sk).await?;
+        let token_address = rollup
+            .token(convert_element_to_h256(&note.note_kind))
+            .await?;
+        let erc20_contract =
+            ERC20Contract::load(rollup.client.clone(), &format!("{token_address:#x}"), sk).await?;
+        // Rollup mint pulls the backing ERC-20 with safeTransferFrom(msg.sender, rollup),
+        // so first-time minters need allowance before submitting the mint transaction.
+        let allowance = erc20_contract
+            .allowance(rollup.signer_address, rollup.address())
+            .await?;
+
+        if allowance != U256::MAX {
+            println!(
+                "\nApproving token {token_address:#x} for rollup {:#x}\n",
+                rollup.address()
+            );
+            let approve_txn = erc20_contract.approve_max(rollup.address()).await?;
+            rollup
+                .client
+                .wait_for_confirm(
+                    approve_txn,
+                    Duration::from_secs(1),
+                    ConfirmationType::Latest,
+                )
+                .await?;
+        }
 
         let mint_hash = hash_merge([note.psi, Note::padding_note().psi]);
 
         println!("Note hash {:#x}, mint hash {:#x}", utxo.hash(), mint_hash);
 
-        let tx = rollup.mint(&mint_hash, &note.value, &note.note_kind).await?;
+        let tx = rollup
+            .mint(&mint_hash, &note.value, &note.note_kind)
+            .await?;
 
         println!("\nSubmitted MINT tx {tx:#x}\n");
 
-        while rollup
+        rollup
             .client
-            .client()
-            .eth()
-            .transaction_receipt(tx)
-            .await
-            .unwrap()
-            .is_none_or(|r| r.block_number.is_none())
-        {
-            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-        }
+            .wait_for_confirm(tx, Duration::from_secs(1), ConfirmationType::Latest)
+            .await?;
 
         Ok(())
     }
