@@ -1,25 +1,33 @@
-use std::{
-    fs,
-    path::PathBuf,
-    process::Command,
-    sync::{Arc, Mutex},
-};
+use std::{fs, path::PathBuf, process::Command, sync::Arc};
 
 use once_cell::sync::Lazy;
 use serde_json::json;
-
-use crate::PortPool;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 fn find_eth() -> PathBuf {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("../../citrea");
-    path
+    repo_root().join("ciphera/citrea")
+}
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+}
+
+fn local_citrea_root() -> PathBuf {
+    repo_root().join(".citrea").join(CITREA_VERSION)
+}
+
+fn citrea_path(env_name: &str, local_path: PathBuf, container_path: &str) -> PathBuf {
+    std::env::var_os(env_name)
+        .map(PathBuf::from)
+        .or_else(|| local_path.exists().then_some(local_path))
+        .unwrap_or_else(|| PathBuf::from(container_path))
 }
 
 const DEV_PRIVATE_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+const CITREA_VERSION: &str = "v2.1.0";
+const CITREA_DEVNET_PORT: u16 = 12345;
 
-static PORT_POOL: Lazy<Mutex<PortPool>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(PortPool::new(12345..12346)));
+static CITREA_NODE_SEMAPHORE: Lazy<Arc<Semaphore>> = Lazy::new(|| Arc::new(Semaphore::new(1)));
 
 /// Addresses deployed by the Hardhat deploy script
 #[derive(Debug, Clone)]
@@ -34,12 +42,12 @@ pub struct EthNode {
     port: u16,
     options: EthNodeOptions,
     deployed: Option<DeployedAddresses>,
+    _citrea_permit: Option<OwnedSemaphorePermit>,
 }
 
 impl Drop for EthNode {
     fn drop(&mut self) {
         self.stop();
-        PORT_POOL.lock().unwrap().release(self.port);
     }
 }
 
@@ -58,30 +66,39 @@ impl Default for EthNode {
 
 impl EthNode {
     pub fn new(options: EthNodeOptions) -> Self {
-        let port = PORT_POOL.lock().unwrap().get();
-
         Self {
             process: None,
-            port,
+            port: CITREA_DEVNET_PORT,
             options,
             deployed: None,
+            _citrea_permit: None,
         }
     }
 
     pub fn run(&mut self) {
         // This must be the actual Citrea dev bin instead of running it through yarn,
         // because we send a SIGKILL which yarn can't forward to the Citrea dev node.
-        let citrea_bin =
-            std::env::var("CIPHERA_TEST_CITREA_BIN").unwrap_or_else(|_| "/citrea".to_string());
-        let configs_root = std::env::var("CIPHERA_TEST_CITREA_CONFIGS_ROOT")
-            .unwrap_or_else(|_| "/configs".to_string());
-        let genesis_root = std::env::var("CIPHERA_TEST_CITREA_GENESIS_ROOT")
-            .unwrap_or_else(|_| "/genesis".to_string());
-        let rollup_config_path = format!("{configs_root}/mock/sequencer_rollup_config.toml");
-        let sequencer_config_path = format!("{configs_root}/mock/sequencer_config.toml");
-        let genesis_path = format!("{genesis_root}/mock/");
+        let local_citrea_root = local_citrea_root();
+        let citrea_bin = citrea_path(
+            "CIPHERA_TEST_CITREA_BIN",
+            local_citrea_root.join("bin/citrea"),
+            "/citrea",
+        );
+        let configs_root = citrea_path(
+            "CIPHERA_TEST_CITREA_CONFIGS_ROOT",
+            local_citrea_root.join("resources/configs"),
+            "/configs",
+        );
+        let genesis_root = citrea_path(
+            "CIPHERA_TEST_CITREA_GENESIS_ROOT",
+            local_citrea_root.join("resources/genesis"),
+            "/genesis",
+        );
+        let rollup_config_path = configs_root.join("mock/sequencer_rollup_config.toml");
+        let sequencer_config_path = configs_root.join("mock/sequencer_config.toml");
+        let genesis_path = genesis_root.join("mock");
 
-        let mut command = Command::new(citrea_bin);
+        let mut command = Command::new(&citrea_bin);
 
         command.current_dir(find_eth());
 
@@ -100,7 +117,17 @@ impl EthNode {
                 .stderr(std::process::Stdio::null());
         }
 
-        let process = command.spawn().expect("Failed to start Citrea dev node");
+        let process = command.spawn().unwrap_or_else(|err| {
+            panic!(
+                "Failed to start Citrea dev node: {err}. Tried binary: {}; configs root: {}; \
+                 genesis root: {}. Set CIPHERA_TEST_CITREA_BIN, CIPHERA_TEST_CITREA_CONFIGS_ROOT, \
+                 and CIPHERA_TEST_CITREA_GENESIS_ROOT, or run scripts/test.sh once to populate \
+                 .citrea/{CITREA_VERSION}.",
+                citrea_bin.display(),
+                configs_root.display(),
+                genesis_root.display()
+            )
+        });
         self.process = Some(process);
     }
 
@@ -305,6 +332,13 @@ impl EthNode {
     }
 
     pub async fn run_and_deploy(mut self) -> Arc<Self> {
+        self._citrea_permit = Some(
+            Arc::clone(&CITREA_NODE_SEMAPHORE)
+                .acquire_owned()
+                .await
+                .expect("Citrea node semaphore closed"),
+        );
+
         let eth_node = tokio::task::spawn_blocking(move || {
             self.run();
             self

@@ -645,29 +645,15 @@ async fn substitute_burn_to_address() {
     let rollup = rollup_contract(server.rollup_contract_addr, &eth_node).await;
     let erc20 = erc20_contract(&rollup, &eth_node).await;
 
-    let wallet_address = rollup.signer_address;
-
-    // The claimer is not exercised by this test path; load a placeholder Claimer
-    // contract pointing at the rollup proxy address so the type checks.
-    let claimer = Client::new(&eth_node.rpc_url(), None)
-        .load_contract_from_str(
-            &hex::encode(rollup.address().as_bytes()),
-            include_str!("../../../burn-substitutor/abi/Claimer.sol/Claimer.json"),
-        )
-        .unwrap();
-
     let mut burn_substitutor = BurnSubstitutor::new(
         rollup.clone(),
         erc20.clone(),
-        claimer,
         server
             .base_url()
             .to_string()
             .trim_end_matches('/')
             .to_owned(),
         Duration::from_millis(50),
-        "http://localhost:3000".to_string(),
-        wallet_address,
     );
 
     let alice_pk = Element::new(0xA11CE);

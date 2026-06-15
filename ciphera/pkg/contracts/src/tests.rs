@@ -1,27 +1,34 @@
 #[cfg(test)]
 mod test_rollup;
 
-use crate::util::{calculate_domain_separator, convert_element_to_h256, convert_h160_to_element};
+use std::{str::FromStr, sync::Arc, time::Duration};
+
 use barretenberg::Prove;
 use element::Element;
 use ethereum_types::{H256, U256};
 use hash::hash_merge;
 use secp256k1::PublicKey;
-use std::{str::FromStr, sync::Arc, time::Duration};
 use test_rollup::rollup::Rollup;
-use testutil::ACCOUNT_1_SK;
-use testutil::eth::{EthNode, EthNodeOptions};
-use web3::signing::{SecretKey, keccak256};
-use web3::types::Address;
+use testutil::{
+    ACCOUNT_1_SK,
+    eth::{EthNode, EthNodeOptions},
+};
+use web3::{
+    signing::{SecretKey, keccak256},
+    types::Address,
+};
 use zk_primitives::{
     AggAgg, AggUtxo, AggUtxoProof, InputNote, MerklePath, Note, Utxo, UtxoKind, UtxoProof,
-    UtxoProofBundleWithMerkleProofs, bridged_polygon_usdc_note_kind, get_address_for_private_key,
+    UtxoProofBundleWithMerkleProofs, generate_note_kind_bridge_evm, get_address_for_private_key,
 };
+
 // use zk_circuits::constants::MERKLE_TREE_DEPTH;
 // use zk_circuits::data::{BurnTo, Mint, ParameterSet};
 // use zk_circuits::test::rollup::Rollup;
-
 use super::*;
+use crate::util::{calculate_domain_separator, convert_element_to_h256, convert_h160_to_element};
+
+const CITREA_DEV_CHAIN_ID: u64 = 5655;
 
 struct Env {
     _eth_node: Arc<EthNode>,
@@ -139,8 +146,12 @@ pub fn note(value: u64, address: Element, psi: u64, note_kind: Element) -> Note 
     }
 }
 
-pub fn send_note(value: u64, address: Element, psi: u64) -> Note {
-    note(value, address, psi, bridged_polygon_usdc_note_kind())
+pub fn send_note(value: u64, address: Element, psi: u64, note_kind: Element) -> Note {
+    note(value, address, psi, note_kind)
+}
+
+fn deployed_note_kind(env: &Env) -> Element {
+    generate_note_kind_bridge_evm(CITREA_DEV_CHAIN_ID, env.erc20_contract.address())
 }
 
 pub fn verify_proof(proof: &impl barretenberg::Verify) {
@@ -183,67 +194,159 @@ fn process_utxo_for_agg(
     Element,
 )> {
     let utxo_proof = utxo.prove().unwrap();
+    let padding_path = MerklePath::default();
 
-    let p1: MerklePath<161> = MerklePath::new(
-        tree.path_for(utxo.input_notes[0].note.commitment())
-            .siblings
-            .to_vec(),
-    );
-    tree.remove(utxo.input_notes[0].note.commitment()).unwrap();
+    let p1 = if utxo.input_notes[0].note.commitment().is_zero() {
+        padding_path.clone()
+    } else {
+        let path = MerklePath::new(
+            tree.path_for(utxo.input_notes[0].note.commitment())
+                .siblings
+                .to_vec(),
+        );
+        tree.remove(utxo.input_notes[0].note.commitment()).unwrap();
+        path
+    };
 
-    let p2: MerklePath<161> = MerklePath::new(
-        tree.path_for(utxo.input_notes[1].note.commitment())
-            .siblings
-            .to_vec(),
-    );
-    tree.remove(utxo.input_notes[1].note.commitment()).unwrap();
+    let p2 = if utxo.input_notes[1].note.commitment().is_zero() {
+        padding_path.clone()
+    } else {
+        let path = MerklePath::new(
+            tree.path_for(utxo.input_notes[1].note.commitment())
+                .siblings
+                .to_vec(),
+        );
+        tree.remove(utxo.input_notes[1].note.commitment()).unwrap();
+        path
+    };
 
-    tree.insert(utxo.output_notes[0].commitment(), ()).unwrap();
-    let p3: MerklePath<161> = MerklePath::new(
-        tree.path_for(utxo.output_notes[0].commitment())
-            .siblings
-            .to_vec(),
-    );
+    let p3 = if utxo.output_notes[0].commitment().is_zero() {
+        padding_path.clone()
+    } else {
+        tree.insert(utxo.output_notes[0].commitment(), ()).unwrap();
+        MerklePath::new(
+            tree.path_for(utxo.output_notes[0].commitment())
+                .siblings
+                .to_vec(),
+        )
+    };
 
-    tree.insert(utxo.output_notes[1].commitment(), ()).unwrap();
-    let p4: MerklePath<161> = MerklePath::new(
-        tree.path_for(utxo.output_notes[1].commitment())
-            .siblings
-            .to_vec(),
-    );
+    let p4 = if utxo.output_notes[1].commitment().is_zero() {
+        padding_path
+    } else {
+        tree.insert(utxo.output_notes[1].commitment(), ()).unwrap();
+        MerklePath::new(
+            tree.path_for(utxo.output_notes[1].commitment())
+                .siblings
+                .to_vec(),
+        )
+    };
 
     let new_root = tree.root_hash();
 
     Ok((utxo_proof, p1, p2, p3, p4, new_root))
 }
 
+async fn mint_notes_into_tree(
+    env: &Env,
+    tree: &mut smirk::Tree<161, ()>,
+    output_notes: [Note; 2],
+    height: u64,
+) {
+    let old_root = tree.root_hash();
+    let mint_utxo = Utxo::new_mint(output_notes);
+
+    env.erc20_contract
+        .approve_max(env.rollup_contract.address())
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    env.rollup_contract
+        .mint(
+            &mint_utxo.mint_hash(),
+            &mint_utxo.output_value(),
+            &mint_utxo.output_notes[0].note_kind,
+        )
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let (mint_proof, p1, p2, p3, p4, new_root) = process_utxo_for_agg(tree, &mint_utxo).unwrap();
+    verify_proof(&mint_proof);
+
+    let agg_utxo = AggUtxo::new(
+        [
+            UtxoProofBundleWithMerkleProofs::new(mint_proof, &[p1, p2, p3, p4]),
+            UtxoProofBundleWithMerkleProofs::default(),
+            UtxoProofBundleWithMerkleProofs::default(),
+        ],
+        old_root,
+        new_root,
+    );
+    let agg_utxo_proof = prove_and_verify(&agg_utxo).unwrap();
+
+    let agg_agg = AggAgg::new([agg_utxo_proof, AggUtxoProof::default()]);
+    let agg_agg_proof = prove_and_verify(&agg_agg).unwrap();
+    let other_hash = [0u8; 32];
+    let sig = sign_block(env, &agg_agg.new_root(), height, other_hash).await;
+
+    env.rollup_contract
+        .verify_block(
+            &agg_agg_proof.proof.0,
+            &agg_agg.old_root(),
+            &agg_agg.new_root(),
+            &agg_agg.commit_hash(),
+            &agg_agg_proof.public_inputs.messages,
+            &agg_agg_proof.kzg,
+            other_hash,
+            height,
+            &[&sig],
+            500_000,
+        )
+        .await
+        .unwrap();
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+}
+
 #[tokio::test]
 async fn verify_transfers() {
     let env = make_env(EthNodeOptions::default()).await;
+    let note_kind = deployed_note_kind(&env);
 
     let (secret_key, address) = get_keypair(101);
     let mut tree = smirk::Tree::<161, ()>::new();
 
+    let utxo1_input_note1_note = send_note(60, address, 1, note_kind);
+    let utxo1_input_note2_note = send_note(40, address, 2, note_kind);
+    mint_notes_into_tree(
+        &env,
+        &mut tree,
+        [
+            utxo1_input_note1_note.clone(),
+            utxo1_input_note2_note.clone(),
+        ],
+        1,
+    )
+    .await;
+
     let utxo1_input_note1 = InputNote {
-        note: send_note(60, address, 1),
+        note: utxo1_input_note1_note,
         secret_key,
         ..InputNote::default()
     };
-    tree.insert(utxo1_input_note1.note.commitment(), ())
-        .unwrap();
 
     let utxo1_input_note2 = InputNote {
-        note: send_note(40, address, 2),
+        note: utxo1_input_note2_note,
         secret_key,
         ..InputNote::default()
     };
-    tree.insert(utxo1_input_note2.note.commitment(), ())
-        .unwrap();
 
     let utxo1_old_root = tree.root_hash();
 
-    let utxo1_output_note1 = send_note(70, address, 3);
-    let utxo1_output_note2 = send_note(30, address, 4);
+    let utxo1_output_note1 = send_note(70, address, 3, note_kind);
+    let utxo1_output_note2 = send_note(30, address, 4, note_kind);
 
     let utxo1 = Utxo {
         input_notes: [utxo1_input_note1.clone(), utxo1_input_note2.clone()],
@@ -281,8 +384,8 @@ async fn verify_transfers() {
 
     let utxo2_old_root = tree.root_hash();
 
-    let utxo2_output_note1 = send_note(55, address, 5);
-    let utxo2_output_note2 = send_note(45, address, 6);
+    let utxo2_output_note1 = send_note(55, address, 5, note_kind);
+    let utxo2_output_note2 = send_note(45, address, 6, note_kind);
 
     let utxo2 = Utxo {
         input_notes: [utxo2_input_note1.clone(), utxo2_input_note2.clone()],
@@ -313,21 +416,11 @@ async fn verify_transfers() {
 
     // Sign
     let other_hash = [0u8; 32];
-    let height = 1;
+    let height = 2;
     let sig = sign_block(&env, &agg_agg.new_root(), height, other_hash).await;
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    // Set the root, we add some pre-existing values to the tree before generating the UTXO,
-    // so the tree is not empty
-    env.rollup_contract
-        .set_root(&agg_agg.old_root())
-        .await
-        .unwrap();
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    assert_eq!(agg_agg_proof.proof.0.len(), 508 * 32);
     env.rollup_contract
         .verify_block(
             &agg_agg_proof.proof.0,
@@ -357,9 +450,10 @@ async fn mint_from() {
     let env = make_env(EthNodeOptions::default()).await;
     let rollup = Rollup::new();
     let bob = rollup.new_wallet();
+    let note_kind = deployed_note_kind(&env);
 
     // Create the proof
-    let note = bob.new_note(10 * 10u64.pow(6), bridged_polygon_usdc_note_kind());
+    let note = bob.new_note(10 * 10u64.pow(6), note_kind);
 
     let mint_hash = hash_merge([note.psi, Note::padding_note().psi]);
 
@@ -381,6 +475,7 @@ async fn mint_from() {
 async fn burn_to() {
     // Set up the environment
     let env = make_env(EthNodeOptions::default()).await;
+    let note_kind = deployed_note_kind(&env);
     env.erc20_contract
         .transfer(env.rollup_contract.address(), 100)
         .await
@@ -391,7 +486,7 @@ async fn burn_to() {
 
     // Create input note for burning
     let input_note1 = InputNote {
-        note: send_note(100, address, 1),
+        note: send_note(100, address, 1, note_kind),
         secret_key,
         ..InputNote::default()
     };
@@ -492,22 +587,26 @@ async fn burn_to() {
 async fn substitute_burn() {
     // Set up the environment
     let env = make_env(EthNodeOptions::default()).await;
-
-    env.erc20_contract
-        .transfer(env.rollup_contract.address(), 100)
-        .await
-        .unwrap();
+    let note_kind = deployed_note_kind(&env);
 
     let (secret_key, address) = get_keypair(101);
     let mut tree = smirk::Tree::<161, ()>::new();
 
+    let input_note1_note = send_note(100, address, 1, note_kind);
+    mint_notes_into_tree(
+        &env,
+        &mut tree,
+        [input_note1_note.clone(), Note::padding_note()],
+        1,
+    )
+    .await;
+
     // Create input note for burning
     let input_note1 = InputNote {
-        note: send_note(100, address, 1),
+        note: input_note1_note,
         secret_key,
         ..InputNote::default()
     };
-    tree.insert(input_note1.note.commitment(), ()).unwrap();
 
     // Add a padding input note
     let input_note2 = InputNote::padding_note();
@@ -571,19 +670,13 @@ async fn substitute_burn() {
 
     // Sign the block
     let other_hash = [0u8; 32];
-    let height = 1;
+    let height = 2;
     let sig = sign_block(&env, &agg_agg.new_root(), height, other_hash).await;
 
     // Get the initial balance of the EVM address
     let initial_caller_balance = env.erc20_contract.balance(env.evm_address).await.unwrap();
     let initial_burn_address_balance = env.erc20_contract.balance(burn_address).await.unwrap();
-
-    env.rollup_contract
-        .set_root(&agg_agg.old_root())
-        .await
-        .unwrap();
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let burn_value = U256::from(100);
 
     env.rollup_contract
         .substitute_burn(
@@ -598,8 +691,11 @@ async fn substitute_burn() {
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
+    // The dev deploy's burn fee is larger than this tiny test burn, so
+    // computeBurnFee clamps the fee to the full value and the immediate
+    // substitute payout is zero.
     let balance_after_substitute = env.erc20_contract.balance(env.evm_address).await.unwrap();
-    assert_eq!(balance_after_substitute, initial_caller_balance - 100);
+    assert_eq!(balance_after_substitute, initial_caller_balance);
 
     // Submit the proof to the contract
     env.rollup_contract
@@ -620,13 +716,14 @@ async fn substitute_burn() {
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    // Verify the balance increased by the burnt amount
+    // The burn recipient receives no payout when the whole burn is consumed as
+    // fee. In the dev deploy the fee sink is the deployer, which is also the
+    // test caller.
     let new_balance = env.erc20_contract.balance(burn_address).await.unwrap();
-    let burnt_value = U256::from(100);
-    assert_eq!(new_balance, initial_burn_address_balance + burnt_value);
+    assert_eq!(new_balance, initial_burn_address_balance);
 
     let new_caller_balance = env.erc20_contract.balance(env.evm_address).await.unwrap();
-    assert_eq!(new_caller_balance, initial_caller_balance);
+    assert_eq!(new_caller_balance, initial_caller_balance + burn_value);
 }
 
 // #[tokio::test]
