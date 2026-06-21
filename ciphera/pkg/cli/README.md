@@ -39,8 +39,15 @@ export CIPHERA_ROLLUP=$(curl -sS "$CIPHERA_HOST/v0/network" | jq -r '.rollup_con
 ciphera-cli --name alice --host "$CIPHERA_HOST" --chain "$CITREA_CHAIN" create
 ciphera-cli --name alice --host "$CIPHERA_HOST" --chain "$CITREA_CHAIN" sync
 
-# Mint tokens (requires a funded Citrea key with WCBTC and cBTC for gas;
-# approves the rollup if allowance is missing)
+# Approve the node-advertised rollup once for minting
+ciphera-cli \
+  --host "$CIPHERA_HOST" \
+  --chain "$CITREA_CHAIN" \
+  approve-mint \
+  --secret YOUR_CITREA_PRIVATE_KEY \
+  --geth-rpc "$CITREA_RPC"
+
+# Mint tokens (requires a funded Citrea key with WCBTC and cBTC for gas)
 ciphera-cli --name alice \
   --host "$CIPHERA_HOST" \
   --chain "$CITREA_CHAIN" \

@@ -37,19 +37,22 @@ on_error() {
   echo "Demo failed with exit code $rc."
   echo "Failed step: ${CURRENT_STEP:-setup}"
   echo "Run directory: $DEMO_DIR"
-  if [ -n "${SWAP_STATE:-}" ]; then
-    echo "Swap state: $SWAP_STATE"
+  if [ -n "${SELLER_STATE:-}" ]; then
+    echo "Seller state: $SELLER_STATE"
   fi
-  if [ -n "${OUT:-}" ] && [ -f "$OUT-refund.json" ]; then
-    echo "Refund note: $OUT-refund.json"
+  if [ -n "${BUYER_STATE:-}" ]; then
+    echo "Buyer state: $BUYER_STATE"
+  fi
+  if [ -n "${BUYER_OUT:-}" ] && [ -f "$BUYER_OUT-refund.json" ]; then
+    echo "Refund note: $BUYER_OUT-refund.json"
     if [ -n "${WALLETS:-}" ] && [ -n "${CIPHERA_CLI:-}" ]; then
       echo "After the refund timelock, recover from the Zerosats wallet dir with:"
       printf '  cd %q && %q --name %q --host %q --chain %q escrow-refund --note %q\n' \
         "$WALLETS" "$CIPHERA_CLI" "$FUNDER_ZEROSATS_WALLET" "$CIPHERA_HOST" \
-        "$CITREA_CHAIN" "$OUT-refund.json"
+        "$CITREA_CHAIN" "$BUYER_OUT-refund.json"
     fi
   fi
-  echo "Do not run zerosats-claim unless mercury-receive succeeded for STATECHAIN_ID=${STATECHAIN_ID:-unknown}."
+  echo "Do not run seller claim unless ${SWAP_JSON:-swap.json} contains buyer_receive for STATECHAIN_ID=${STATECHAIN_ID:-unknown}."
   exit "$rc"
 }
 trap on_error ERR
@@ -84,6 +87,43 @@ install_barretenberg() {
   "$BB_PATH/bb" --version
 }
 
+inspect_swap_transcript() {
+  if [ ! -f "$SWAP_JSON" ]; then
+    return
+  fi
+
+  log "operator inspects swap transcript: $(basename "$SWAP_JSON")"
+  "$SWAP" inspect-swap --swap "$SWAP_JSON" | jq -r '
+    "  transcript_version: \(.version)",
+    "  statechain_id: " + (.statechain_id // "unknown"),
+    "  completed_sections: " + (.completed_sections | join(", ")),
+    "  next: " + (.next_command // "none"),
+    "  safe_contents: " + (.safe_contents | join(", "))
+  '
+}
+
+print_state_status() {
+  local label="$1"
+  local state_file="$2"
+
+  if [ ! -f "$state_file" ]; then
+    return
+  fi
+
+  "$SWAP" status --state "$state_file" | jq -r --arg label "$label" '
+    "  local_next[" + $label + "]: " + (.next_local_command // "none"),
+    (if .waiting_for then "  waiting_for[" + $label + "]: " + .waiting_for.file + " via " + .waiting_for.command else empty end),
+    (if (.available_exports | length) > 0 then "  exports[" + $label + "]: " + ([.available_exports[].file] | join(", ")) else empty end)
+  '
+}
+
+print_step_status() {
+  case "$1" in
+    seller-*) print_state_status seller "$SELLER_STATE" ;;
+    buyer-*) print_state_status buyer "$BUYER_STATE" ;;
+  esac
+}
+
 json_step() {
   local name="$1"
   local title="$2"
@@ -98,50 +138,50 @@ json_step() {
   "$@" >/dev/null
 
   print_step_summary "$name"
-  printf '  state: %s\n' "$SWAP_STATE"
+  print_step_status "$name"
   printf '  status: ok\n'
 }
 
 print_step_summary() {
   local name="$1"
   case "$name" in
-    init-state)
-      jq -r '"  summary: statechain_id=\(.config.statechain_id) amount_sat=\(.config.amount_sat) mercury_amount_sat=\(.config.mercury_amount_sat)"' "$SWAP_STATE"
+    seller-init)
+      jq -r '"  summary: seller statechain_id=\(.terms.statechain_id) amount_sat=\(.terms.amount_sat) mercury_amount_sat=\(.terms.mercury_amount_sat)"' "$SELLER_STATE"
+      printf '  state: %s\n' "$SELLER_STATE"
       ;;
-    mercury-create-hash)
-      jq -r '"  summary: batch_id=\(.create_hash.batch_id) payment_hash=\(.create_hash.payment_hash)"' "$SWAP_STATE"
+    seller-offer)
+      jq -r '"  transcript: seller_offer batch_id=\(.seller_offer.create_hash.batch_id)"' "$SWAP_JSON"
+      printf '  public: %s\n' "$SWAP_JSON"
+      printf '  state: %s\n' "$SELLER_STATE"
       ;;
-    mercury-address)
-      jq -r '"  summary: mercury_transfer_address=\(.mercury_address.mercury_transfer_address)"' "$SWAP_STATE"
+    buyer-accept)
+      jq -r '"  transcript: buyer_addresses mercury=\(.buyer_addresses.mercury_address.mercury_transfer_address) refund=\(.buyer_addresses.zerosats_address.refund_address)"' "$SWAP_JSON"
+      printf '  public: %s\n' "$SWAP_JSON"
+      printf '  state: %s\n' "$BUYER_STATE"
       ;;
-    zerosats-address)
-      jq -r '"  summary: refund_address=\(.zerosats_address.refund_address)"' "$SWAP_STATE"
+    seller-template)
+      jq -r '"  transcript: seller_template commitment=\(.seller_template.template.latch_commitment)"' "$SWAP_JSON"
+      printf '  public: %s\n' "$SWAP_JSON"
+      printf '  state: %s\n' "$SELLER_STATE"
       ;;
-    zerosats-template)
-      jq -r '"  summary: template_note=\(.template.template_note)"' "$SWAP_STATE"
-      jq -r '"  summary: latch_commitment=\(.template.latch_commitment)"' "$SWAP_STATE"
+    buyer-funding)
+      jq -r '"  transcript: buyer_funding tx=\(.buyer_funding.fund.lock_transaction.txn_hash)"' "$SWAP_JSON"
+      printf '  public: %s\n' "$SWAP_JSON"
+      printf '  state: %s\n' "$BUYER_STATE"
       ;;
-    zerosats-fund)
-      jq -r '"  summary: refund_note=\(.fund.refund_note) balance_sat=\(.fund.balance_sat)"' "$SWAP_STATE"
+    seller-release)
+      jq -r '"  transcript: seller_unlock unlocked=\(.seller_unlock.unlock.unlocked)"' "$SWAP_JSON"
+      printf '  public: %s\n' "$SWAP_JSON"
+      printf '  state: %s\n' "$SELLER_STATE"
       ;;
-    zerosats-verify)
-      jq -r '"  summary: commitment=\(.verify.latch_verify.commitment) height=\(.verify.latch_verify.height)"' "$SWAP_STATE"
+    buyer-receipt)
+      jq -r '"  transcript: buyer_receive received_amount_sat=\(.buyer_receive.receive.received_mercury_amount_sat)"' "$SWAP_JSON"
+      printf '  public: %s\n' "$SWAP_JSON"
+      printf '  state: %s\n' "$BUYER_STATE"
       ;;
-    mercury-transfer)
-      jq -r '"  summary: retrieved_hash=\(.transfer.retrieved_hash) hash_matches=\(.transfer.hash_matches)"' "$SWAP_STATE"
-      ;;
-    mercury-unlock)
-      jq -r '"  summary: unlocked=\(.unlock.unlocked) verified_height=\(.unlock.latch_verify.height)"' "$SWAP_STATE"
-      ;;
-    mercury-receive)
-      jq -r '"  summary: received_amount_sat=\(.receive.received_mercury_amount_sat) expected_statechain=\(.receive.received_expected_statechain_id)"' "$SWAP_STATE"
-      ;;
-    mercury-preimage)
-      jq -r '"  summary: preimage_hash=\(.preimage.preimage_hash) hash_matches=\(.preimage.hash_matches)"' "$SWAP_STATE"
-      printf '  secret: preimage stored in state file only\n'
-      ;;
-    zerosats-claim)
-      jq -r '"  summary: claim_tx=\(.claim.claim_transaction.txn_hash) balance_sat=\(.claim.balance_sat) ticker=\(.claim.ticker)"' "$SWAP_STATE"
+    seller-claim)
+      jq -r '"  summary: claim_tx=\(.claim.claim_transaction.txn_hash) balance_sat=\(.claim.balance_sat) ticker=\(.claim.ticker)"' "$SELLER_STATE"
+      printf '  state: %s\n' "$SELLER_STATE"
       ;;
   esac
 }
@@ -185,7 +225,7 @@ require_private_key() {
 }
 
 log "demo run directory: $DEMO_DIR"
-mkdir -p "$ZEROSATS_WALLET_DIR" "$DEMO_DIR/mercury-wallet"
+mkdir -p "$ZEROSATS_WALLET_DIR" "$DEMO_DIR/mercury-wallet" "$DEMO_DIR/seller" "$DEMO_DIR/buyer"
 
 export SWAP_DIR="$CIPHERA_DIR/pkg/mercury-latch-swap"
 export SWAP_MANIFEST="$SWAP_DIR/Cargo.toml"
@@ -195,12 +235,14 @@ export MERCURY_CLIENT_MANIFEST="$MERCURY_LAB_DIR/clients/apps/rust/Cargo.toml"
 export MERCURY_CLIENT="$MERCURY_LAB_DIR/target/debug/client-rust"
 export SETTINGS="$DEMO_DIR/mercury-wallet/Settings.toml"
 export ML="$DEMO_DIR/ml"
-export OUT="$DEMO_DIR/mercury-ciphera-swap"
+export SELLER_OUT="$DEMO_DIR/seller/mercury-ciphera-swap"
+export BUYER_OUT="$DEMO_DIR/buyer/mercury-ciphera-swap"
+export SWAP_JSON="$DEMO_DIR/swap.json"
 export WALLETS="$ZEROSATS_WALLET_DIR"
 export MERCURY_SETTINGS_FILE="$SETTINGS"
-export SWAP_OUTPUT_PREFIX="$OUT"
-export SWAP_STATE="$OUT-state.json"
-export TOTAL_SWAP_STEPS=12
+export SELLER_STATE="$SELLER_OUT-state.json"
+export BUYER_STATE="$BUYER_OUT-state.json"
+export TOTAL_SWAP_STEPS=8
 export SWAP_STEP=0
 
 export SELLER_WALLET="${SELLER_WALLET:-seller}"
@@ -220,7 +262,7 @@ export CITREA_CHAIN="${CITREA_CHAIN:-5115}"
 export CITREA_RPC="${CITREA_RPC:-https://rpc.testnet.citrea.xyz}"
 export BTC_EXPLORER="${BTC_EXPLORER:-https://mempool.space}"
 
-export MERCURY_AMOUNT_SAT="${MERCURY_AMOUNT_SAT:-10000}"
+export MERCURY_AMOUNT_SAT="${MERCURY_AMOUNT_SAT:-1000}"
 export AMOUNT_SAT="${AMOUNT_SAT:-1000}"
 export REFUND_BLOCKS="${REFUND_BLOCKS:-2}"
 
@@ -263,8 +305,8 @@ chmod +x "$ML"
 
 section "Prepare Mercury"
 log "creating Mercury wallets"
-"$ML" create-wallet "$OWNER_MERCURY_WALLET"
-"$ML" create-wallet "$RECEIVER_MERCURY_WALLET"
+"$ML" create-wallet "$OWNER_MERCURY_WALLET" >/dev/null
+"$ML" create-wallet "$RECEIVER_MERCURY_WALLET" >/dev/null
 
 log "funding Mercury token fee if required"
 "$ML" new-token | tee "$DEMO_DIR/token.json"
@@ -332,6 +374,14 @@ if [ "$BALANCE_WEI" -lt "$NEEDED_WEI" ]; then
   CIPHERA_ROLLUP="$(curl -fsS "$CIPHERA_HOST/v0/network" | jq -r '.rollup_contract')"
   export CIPHERA_ROLLUP
 
+  log "approving Zerosats mint allowance"
+  "$CIPHERA_CLI" \
+    --host "$CIPHERA_HOST" \
+    --chain "$CITREA_CHAIN" \
+    approve-mint \
+    --secret "$CITREA_PRIVATE_KEY" \
+    --geth-rpc "$CITREA_RPC"
+
   log "minting buyer Zerosats wallet"
   "$CIPHERA_CLI" \
     --name "$FUNDER_ZEROSATS_WALLET" \
@@ -350,91 +400,96 @@ fi
 
 section "Swap"
 log "starting timed swap batch"
-json_step init-state \
-  "Initialize local swap state" \
-  "$SWAP" init-state \
-    --state "$SWAP_STATE" \
+json_step seller-init \
+  "Seller initializes local state" \
+  "$SWAP" seller init \
+    --state "$SELLER_STATE" \
     --mercury-settings-file "$SETTINGS" \
+    --mercury-wallet "$OWNER_MERCURY_WALLET" \
+    --zerosats-wallet "$CLAIMER_ZEROSATS_WALLET" \
+    --zerosats-wallet-dir "$WALLETS" \
+    --output-prefix "$SELLER_OUT" \
     --statechain-id "$STATECHAIN_ID" \
     --amount-sat "$AMOUNT_SAT" \
     --mercury-amount-sat "$MERCURY_AMOUNT_SAT" \
-    --owner-mercury-wallet "$OWNER_MERCURY_WALLET" \
-    --receiver-mercury-wallet "$RECEIVER_MERCURY_WALLET" \
-    --funder-zerosats-wallet "$FUNDER_ZEROSATS_WALLET" \
-    --claimer-zerosats-wallet "$CLAIMER_ZEROSATS_WALLET" \
-    --zerosats-wallet-dir "$WALLETS" \
     --zerosats-host "$CIPHERA_HOST" \
     --citrea-chain "$CITREA_CHAIN" \
     --refund-blocks "$REFUND_BLOCKS" \
-    --btc-explorer "$BTC_EXPLORER" \
-    --output-prefix "$OUT"
+    --btc-explorer "$BTC_EXPLORER"
 
-json_step mercury-create-hash \
-  "Mercury creates payment hash and batch id" \
-  "$SWAP" mercury-create-hash \
-    --state "$SWAP_STATE"
+json_step seller-offer \
+  "Seller creates offer section in swap transcript" \
+  "$SWAP" seller offer \
+    --state "$SELLER_STATE" \
+    --swap "$SWAP_JSON"
 
-json_step mercury-address \
-  "Mercury creates transfer address" \
-  "$SWAP" mercury-address \
-    --state "$SWAP_STATE"
+inspect_swap_transcript
 
-json_step zerosats-address \
-  "Zerosats creates refund address" \
-  "$SWAP" zerosats-address \
-    --state "$SWAP_STATE"
+json_step buyer-accept \
+  "Buyer imports offer and adds addresses to swap transcript" \
+  "$SWAP" buyer accept \
+    --state "$BUYER_STATE" \
+    --swap "$SWAP_JSON" \
+    --mercury-settings-file "$SETTINGS" \
+    --mercury-wallet "$RECEIVER_MERCURY_WALLET" \
+    --zerosats-wallet "$FUNDER_ZEROSATS_WALLET" \
+    --zerosats-wallet-dir "$WALLETS" \
+    --output-prefix "$BUYER_OUT"
 
-json_step zerosats-template \
-  "Zerosats creates unfunded latch template" \
-  "$SWAP" zerosats-template \
-    --state "$SWAP_STATE"
+inspect_swap_transcript
 
-json_step zerosats-fund \
-  "Zerosats funds exact latch template" \
-  "$SWAP" zerosats-fund \
-    --state "$SWAP_STATE"
+json_step seller-template \
+  "Seller imports addresses and adds template to swap transcript" \
+  "$SWAP" seller template \
+    --state "$SELLER_STATE" \
+    --swap "$SWAP_JSON"
 
-json_step zerosats-verify \
-  "Zerosats verifies funded latch before Mercury transfer" \
-  "$SWAP" zerosats-verify \
-    --state "$SWAP_STATE"
+inspect_swap_transcript
 
-json_step mercury-transfer \
-  "Mercury starts locked transfer" \
-  "$SWAP" mercury-transfer \
-    --state "$SWAP_STATE"
+json_step buyer-funding \
+  "Buyer imports template and adds funding to swap transcript" \
+  "$SWAP" buyer fund \
+    --state "$BUYER_STATE" \
+    --swap "$SWAP_JSON"
 
-json_step mercury-unlock \
-  "Mercury unlocks transfer after fresh Zerosats verification" \
-  "$SWAP" mercury-unlock \
-    --state "$SWAP_STATE"
+inspect_swap_transcript
 
-json_step mercury-receive \
-  "Mercury receiver completes receive" \
-  "$SWAP" mercury-receive \
-    --state "$SWAP_STATE"
+json_step seller-release \
+  "Seller verifies funding, releases Mercury, and adds unlock notice" \
+  "$SWAP" seller release \
+    --state "$SELLER_STATE" \
+    --swap "$SWAP_JSON" \
+    --release-mercury
 
-json_step mercury-preimage \
-  "Mercury owner retrieves preimage after receive" \
-  "$SWAP" mercury-preimage \
-    --state "$SWAP_STATE"
+inspect_swap_transcript
 
-json_step zerosats-claim \
-  "Zerosats claimer claims latch with preimage" \
-  "$SWAP" zerosats-claim \
-    --state "$SWAP_STATE"
+json_step buyer-receipt \
+  "Buyer imports unlock and adds receive confirmation" \
+  "$SWAP" buyer receive \
+    --state "$BUYER_STATE" \
+    --swap "$SWAP_JSON"
+
+inspect_swap_transcript
+
+json_step seller-claim \
+  "Seller imports receive confirmation, retrieves preimage, and claims latch" \
+  "$SWAP" seller claim \
+    --state "$SELLER_STATE" \
+    --swap "$SWAP_JSON"
 
 section "Final Checks"
 log "checking final balances and artifacts"
 "$ML" list-statecoins "$RECEIVER_MERCURY_WALLET" | tee "$DEMO_DIR/buyer-statecoins-final.json"
 sync_wallet "$CLAIMER_ZEROSATS_WALLET"
 jq '.name, .chain_id, .balance' "$ZEROSATS_WALLET_DIR/${CLAIMER_ZEROSATS_WALLET}.json"
-ls -l "$OUT-refund.json"
-jq .claim "$SWAP_STATE"
+ls -l "$BUYER_OUT-refund.json"
+jq .claim "$SELLER_STATE"
 
 log "demo complete"
 echo "Run directory: $DEMO_DIR"
-echo "Swap state: $SWAP_STATE"
+echo "Seller state: $SELLER_STATE"
+echo "Buyer state: $BUYER_STATE"
+echo "Swap transcript: $SWAP_JSON"
 EOF
 
 chmod +x "$RUNNER"
@@ -454,17 +509,19 @@ export CIPHERA_HOST=$(printf '%q' "${CIPHERA_HOST:-https://ciphera.satsbridge.co
 export CITREA_CHAIN=$(printf '%q' "${CITREA_CHAIN:-5115}")
 export CITREA_RPC=$(printf '%q' "${CITREA_RPC:-https://rpc.testnet.citrea.xyz}")
 export BTC_EXPLORER=$(printf '%q' "${BTC_EXPLORER:-https://mempool.space}")
-export MERCURY_AMOUNT_SAT=$(printf '%q' "${MERCURY_AMOUNT_SAT:-10000}")
+export MERCURY_AMOUNT_SAT=$(printf '%q' "${MERCURY_AMOUNT_SAT:-1000}")
 export AMOUNT_SAT=$(printf '%q' "${AMOUNT_SAT:-1000}")
 export REFUND_BLOCKS=$(printf '%q' "${REFUND_BLOCKS:-2}")
 export SWAP=$(printf '%q' "$CIPHERA_DIR/pkg/mercury-latch-swap/target/debug/mercury-latch-swap")
 export RUNNER=$(printf '%q' "$RUNNER")
 export SETTINGS=$(printf '%q' "$DEMO_DIR/mercury-wallet/Settings.toml")
-export OUT=$(printf '%q' "$DEMO_DIR/mercury-ciphera-swap")
 export WALLETS=$(printf '%q' "$ZEROSATS_WALLET_DIR")
 export MERCURY_SETTINGS_FILE=$(printf '%q' "$DEMO_DIR/mercury-wallet/Settings.toml")
-export SWAP_OUTPUT_PREFIX=$(printf '%q' "$DEMO_DIR/mercury-ciphera-swap")
-export SWAP_STATE=$(printf '%q' "$DEMO_DIR/mercury-ciphera-swap-state.json")
+export SELLER_OUT=$(printf '%q' "$DEMO_DIR/seller/mercury-ciphera-swap")
+export BUYER_OUT=$(printf '%q' "$DEMO_DIR/buyer/mercury-ciphera-swap")
+export SWAP_JSON=$(printf '%q' "$DEMO_DIR/swap.json")
+export SELLER_STATE=$(printf '%q' "$DEMO_DIR/seller/mercury-ciphera-swap-state.json")
+export BUYER_STATE=$(printf '%q' "$DEMO_DIR/buyer/mercury-ciphera-swap-state.json")
 export SELLER_WALLET=$(printf '%q' "${SELLER_WALLET:-seller}")
 export BUYER_WALLET=$(printf '%q' "${BUYER_WALLET:-buyer}")
 export OWNER_MERCURY_WALLET=$(printf '%q' "${OWNER_MERCURY_WALLET:-${SELLER_WALLET:-seller}}")

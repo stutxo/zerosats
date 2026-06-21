@@ -18,7 +18,7 @@ use color_eyre::{
 use element::Element;
 use hash::hash_merge;
 use node_interface::{ElementsResponseSingle, TransactionResponse};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use zk_primitives::{EscrowInputNote, Note, TimeLock, TimeProof, get_address_for_private_key};
 
@@ -174,6 +174,30 @@ pub fn validate_latch_template(
     .map_err(|e| eyre!("latch template verification failed: {e}"))
 }
 
+pub fn validate_latch_template_json(
+    template_json: &serde_json::Value,
+    chain: u64,
+    amount_wei: u64,
+    ticker: &str,
+    payment_hash: [u8; 32],
+    claim_address: Element,
+    refund_address: Element,
+    refund_blocks: u64,
+) -> Result<Element> {
+    let template: EscrowInputNote = serde_json::from_value(template_json.clone())
+        .wrap_err("failed to parse latch template section JSON")?;
+    validate_latch_template(
+        &template,
+        chain,
+        amount_wei,
+        ticker,
+        payment_hash,
+        claim_address,
+        refund_address,
+        refund_blocks,
+    )
+}
+
 fn verify_latch_note_shape(
     input_note: &EscrowInputNote,
     claim_key_hash: Element,
@@ -282,7 +306,7 @@ pub async fn create_latch_template(req: LatchTemplateRequest<'_>) -> Result<Elem
     );
     let input_note = latch_input_note(note.clone(), Element::ZERO, &lock);
 
-    fs::write(req.output_path, serde_json::to_string_pretty(&input_note)?)?;
+    write_json_file(req.output_path, &input_note)?;
 
     Ok(note.commitment())
 }
@@ -544,12 +568,22 @@ fn write_latch_refund(
     let mut refund_input_note = template.clone();
     refund_input_note.secret_key = refund_secret_key;
     refund_input_note.preimage = [0u8; 32];
-    fs::write(
-        &refund_path,
-        serde_json::to_string_pretty(&refund_input_note)?,
-    )?;
+    write_json_file(&refund_path, &refund_input_note)?;
+    set_private_permissions(&refund_path)?;
 
     Ok(refund_path)
+}
+
+fn write_json_file<T: Serialize>(path: &Path, value: &T) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .wrap_err_with(|| format!("failed to create {}", parent.display()))?;
+        }
+    }
+
+    fs::write(path, format!("{}\n", serde_json::to_string_pretty(value)?))
+        .wrap_err_with(|| format!("failed to write {}", path.display()))
 }
 
 pub fn path_with_suffix(prefix: &Path, suffix: &str) -> PathBuf {
@@ -574,6 +608,19 @@ fn node_client(
         builder = builder.wallet_dir(wallet_dir);
     }
     builder.build(chain, false)
+}
+
+#[cfg(unix)]
+fn set_private_permissions(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .wrap_err_with(|| format!("failed to restrict permissions on {}", path.display()))
+}
+
+#[cfg(not(unix))]
+fn set_private_permissions(_path: &Path) -> Result<()> {
+    Ok(())
 }
 
 async fn get_node_element(
@@ -617,6 +664,47 @@ mod tests {
     fn parse_payment_hash_requires_32_bytes() {
         let err = parse_payment_hash_hex("abcd").unwrap_err().to_string();
         assert!(err.contains("32 bytes"));
+    }
+
+    #[test]
+    fn json_file_writer_creates_parent_directories() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "mercury-latch-template-parent-{}-{nanos}/nested/template.json",
+            std::process::id()
+        ));
+
+        write_json_file(&path, &valid_template_note()).unwrap();
+
+        let saved = load_latch_template(&path).unwrap();
+        assert_eq!(
+            saved.note.commitment(),
+            valid_template_note().note.commitment()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refund_note_is_written_private() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let prefix = std::env::temp_dir().join(format!(
+            "mercury-latch-refund-perms-{}-{nanos}/nested/swap",
+            std::process::id()
+        ));
+
+        let refund_path =
+            write_latch_refund(&prefix, &valid_template_note(), Element::new(99)).unwrap();
+        let mode = fs::metadata(refund_path).unwrap().permissions().mode() & 0o777;
+
+        assert_eq!(mode, 0o600);
     }
 
     fn valid_template_note() -> EscrowInputNote {
